@@ -20,10 +20,8 @@ import time
 #GLobals
 s = None
 
-loginFlag = 0 #if 0, no login was done, it means no TCP connection open
-
 #CS_IP = '127.0.0.1'
-CS_IP = socket.gethostbyname("tejo.tecnico.ulisboa.pt")
+CS_IP = socket.gethostbyname("tejo.ist.utl.pt")
 CS_PORT = 58011
 
 user = None
@@ -34,12 +32,9 @@ commands = ['login', 'deluser', 'backup', 'restore', 'dirlist', 'filelist', 'del
 def login(user, password):
   s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   server_adress = (CS_IP, CS_PORT)
-  print server_adress
   s.connect(server_adress)
   s.send('AUT ' + user + ' ' + password + '\n')
-  print 'SENT LOGIN'
   code = s.recv(4)
-  print code
   
   if code == 'AUR ':
     status = s.recv(3)
@@ -95,7 +90,6 @@ while True:
       if len(cmd[1])==5 and len(cmd[2])==8:
 	user = cmd[1]
 	password = cmd[2]
-	loginFlag = 1
 	s = login(user, password)
 	
     elif cmd[0] == 'deluser':
@@ -116,12 +110,13 @@ while True:
 
       s.close()
       
-    elif cmd[0] == 'backup': #KINDA DONE
+    elif cmd[0] == 'backup':
       s = login(user, password)
       backup_dir = cmd[1]
       
       files_description = ''
       filelist = os.listdir(backup_dir)
+      n = 0
       for f in filelist:
 	files_description += ' ' + f
 	files_description += ' ' + time.strftime('%d.%m.%Y %H:%M:%S', time.gmtime(os.path.getmtime(backup_dir+'/'+f)))
@@ -130,9 +125,6 @@ while True:
       
       n = str(n)
       message = 'BCK ' + backup_dir + ' ' + n + files_description + '\n'
-      print 'BCK MESSAGE TO SEND:'
-      print message
-      print '-----------'
       
       s.send(message)
       
@@ -148,7 +140,6 @@ while True:
       except socket.error:
 	print 'Error receiving the BCK response'
       
-      print csAnswer
       s.close()
       
       csAnswer = csAnswer.split()
@@ -168,32 +159,31 @@ while True:
 	  bsRequestMessage = 'UPL ' + backup_dir + ' ' + str(n)
 	  
 	  while n != 0:
-	    filename = message[filename_position]
-	    filedate = message[filename_position+1]
-	    filetime = message[filename_position+2]
-	    filesize = message[filename_position+3]
+	    filename = csAnswer[filename_position]
+	    filedate = csAnswer[filename_position+1]
+	    filetime = csAnswer[filename_position+2]
+	    filesize = csAnswer[filename_position+3]
 	    
 	    filename_position += 4
 	    n -= 1
 	    
-	    bsRequestMessage += ' ' + filename + ' ' + filedate  + ' ' + filetime + ' ' +  filesize
-	    
+	    bsRequestMessage += ' ' + filename + ' ' + filedate  + ' ' + filetime + ' ' +  filesize + ' '
+	    print 'FILENAME'
+	    print filename
+	    print '--------'
 	    f = open(backup_dir + '/' + filename, 'rb')
-	    filedata = f.read()
+	    filedata = f.read(int(filesize))
 	    f.close()
-	    f.flush()
 	    bsRequestMessage += filedata
-	  
-	  bsRequestMessage += '\n'
 	  
 	  bs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	  bs.connect((BSip, eval(BSport)))
-	  print (BSip, BSport)
 	  bs.send('AUT ' + user + ' ' + password + '\n')
 	  r = bs.recv(1024)
-	  print r
 	  
+	  bsRequestMessage += '\n'
 	  bs.send(bsRequestMessage)
+	  confirmation = ''
 	  try:
 	    confirmation = bs.recv(7)
 	  except:
@@ -201,9 +191,9 @@ while True:
 	  
 	  print confirmation
 	  
-	  b.close()
+	  bs.close()
       
-    elif cmd[0] == 'restore': #KINDA DONE
+    elif cmd[0] == 'restore':
       restore_dir = cmd[1]
       message = 'RST ' + restore_dir + '\n'
       
@@ -211,9 +201,6 @@ while True:
       s.send(message)
       
       csAnswer = s.recv(1024)
-      print ' RSR ANSWER:'
-      print csAnswer
-      print '----------'
       csAnswer = csAnswer.split()
       s.close()
       
@@ -226,17 +213,17 @@ while True:
 	  BSip = csAnswer[1]
 	  BSport = csAnswer[2]
 	  
+	  print '-------------------'
 	  print 'BSip: ' + BSip
 	  print 'BSport: ' + BSport
+	  print '-------------------'
 	  
 	  bs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	  bs.connect((BSip, eval(BSport)))
 	  bs.send('AUT ' + user + ' ' + password + '\n')
 	  
 	  bsAnswer = bs.recv(1024)
-	  print 'BS AUTENTICATION ANSWER: '
 	  print bsAnswer
-	  print '-------'
 	  
 	  bsAnswer = bsAnswer.split()
 	  
@@ -258,23 +245,23 @@ while True:
 		n += a
 
 	      n = int(n)
-	      print n
+	      
+	      not_first = 0
 	      
 	      #Starts reading the files info and data
 	      for i in range(n):
 		print 'FICHEIRO ' + str(i+1)
 		print '------------'
 		space_counter = 0 #Counts the number of spaces encountered
-		bs.recv(1) #Reads the first space before file info
 		while space_counter != 5:
 		  #Starts parsing the file info and data
 		  if space_counter == 0:
-		    a = bs.recv(1) #Reads the first letter of the filename
+		    a = ''
 		    filename = ''
 		    while a != ' ':
 		      filename += a
 		      a = bs.recv(1)
-		    print 'filename: ' + filename
+		    not_first = 1
 		    
 		  elif space_counter == 1:
 		    a = bs.recv(1)
@@ -282,7 +269,6 @@ while True:
 		    while a != ' ':
 		      filedate += a
 		      a = bs.recv(1)
-		    print 'filedate: ' + filedate
 		    
 		  elif space_counter == 2:
 		    a = bs.recv(1)
@@ -290,7 +276,6 @@ while True:
 		    while a != ' ':
 		      filetime += a
 		      a = bs.recv(1)
-		    print 'filetime: ' + filetime
 		    
 		  elif space_counter == 3:
 		    a = bs.recv(1)
@@ -298,26 +283,25 @@ while True:
 		    while a != ' ':
 		      filesize += a
 		      a = bs.recv(1)
-		    print 'filesize: ' + filesize
 		    
 		  elif space_counter == 4:
 		    filedata = bs.recv(1)
 		    for i in range(int(filesize)):
 		      filedata += bs.recv(1)
-		    print 'filedata: ' + filedata
 		    if not os.path.exists('./'+restore_dir):
 		      os.makedirs('./'+restore_dir)
 		    try:
 		      os.remove(restore_dir+'/'+filename)
 		      print filename + 'has been redone'
 		    except:
-		      print 'Creating file: ' + filename
+		      print 'Creating file: ' + filename + '\n'
 		    
 		    f = open(restore_dir+'/'+filename, 'wb+')
 		    f.write(filedata)
 		    f.close()   
-		    
+		  
 		  space_counter += 1
+	    bs.close()
 		  
     elif cmd[0] == 'dirlist':
       message = 'LSD\n'

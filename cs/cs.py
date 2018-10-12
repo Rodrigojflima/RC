@@ -35,8 +35,6 @@ inputs = []
 outputs = []
 
 def userHandler(socket, addr):
-  print 'USER HANDLER UP'
-  print '---------------'
   tosendMessage = ''
   
   autentmsg = socket.recv(18)
@@ -70,9 +68,6 @@ def userHandler(socket, addr):
     sys.exit(0)
   
   command = socket.recv(1024)
-  print 'COMMAND: '
-  print command
-  print '----------'
   if command == '\n': #So fez login
     socket.close()
   else:
@@ -97,7 +92,7 @@ def userHandler(socket, addr):
       elif command[0] == 'RST': # TO DO
 	print 'RST'
 
-      elif command[0] == 'LSD': # TO DO
+      elif command[0] == 'LSD':
 	listd = ''
 	dirs = os.listdir('./user ' + user)
 	n = len(os.listdir('./user_' + user + '.txt'))
@@ -115,13 +110,8 @@ def userHandler(socket, addr):
 	print 'DEL'
 
 
-def bsHandler():
-  print 'BS HANDLER'
-
-
 def servicetcp(s):
   user_socket, addr = s.accept()
-  print 'vim aqui para aceitar a ligacao'
   
   pid = os.fork()
   if pid == 0:
@@ -161,7 +151,7 @@ print 'PORT: ' + str(CS_PORT)
 print 'IP: ' + str(CS_IP)
 
 ADRESS = (CS_IP, int(CS_PORT)) #testas se funciona sem int()
-print ADRESS
+
 
 #Create and start TCP socket to listen to users
 serverTCP = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -179,9 +169,7 @@ inputs.append(serverUDP)
 
 while True:
   
-  print 'Cheguei ao select'
   readable, writable, exceptional = select.select(inputs, outputs, inputs)
-  print 'Seleccionei canal do select'
   
   for s in readable:
     if s == serverTCP:
